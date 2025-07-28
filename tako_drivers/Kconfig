@@ -1,6 +1,8 @@
 # Copyright (c) 2023 Sviatoslav Bulbakha
 # SPDX-License-Identifier: MIT
 
+# add config options
+
 DT_COMPAT_ZMK_KSCAN_GPIO_EC := zmk,kscan-gpio-ec
 
 config ZMK_KSCAN_GPIO_EC
