@@ -1,0 +1,8 @@
+name: tako_drivers
+build:
+  depends:
+    - module
+  cmake: .
+  kconfig: Kconfig
+  settings:
+    dts_root: .
