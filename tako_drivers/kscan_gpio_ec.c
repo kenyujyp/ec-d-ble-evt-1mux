@@ -34,19 +34,19 @@
  // clang-format off
  
  const uint16_t actuation_threshold[] = {
-   500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
-   500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
-   500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
-   500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
-   500, 500, 500, 500, 500, 500
+   500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+   500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+   500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+   500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+   500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500
  };
  
  const uint16_t release_threshold[] = {
-   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
-   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
-   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
-   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
-   450, 450, 450, 450, 450, 450
+   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
+   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
+   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
+   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
+   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450
  };
  // clang-format on
  
@@ -59,6 +59,7 @@
   struct k_timer work_timer;
   kscan_callback_t callback;
   bool *matrix_state;
+  uint16_t *matrix_read;
 };
 
  
@@ -87,15 +88,15 @@
    
  };
  
- /**
+ /*
   * Get the index of a matrix state array from a row and column.
   */
  static int state_index_rc(const struct kscan_ec_config *config, const int row,
                            const int col) {
    __ASSERT(row < config->rows, "Invalid row %i", row);
    __ASSERT(col < config->cols, "Invalid col %i", row);
-   /* offset by column length, if row=1, col_len=14, offset= 1x14 */
-   return (row * ((config->cols)/2)) + col;
+   /* offset by column length, if row=1, col_len=15, offset= 1x15 */
+   return (row * config->cols) + col;
  }
  
  static int kscan_ec_configure(const struct device *dev,
@@ -147,8 +148,6 @@ static void kscan_ec_work_handler(struct k_work *work) {
 
   /* adc read status */
   int rc;
-  /* matrix reading, consider moving it to config, not needed to initialize every time */
-  int16_t matrix_read[config->rows * config->cols];
  
    /* power on everything */
    gpio_pin_set_dt(&config->power.spec, 1);
@@ -158,30 +157,21 @@ static void kscan_ec_work_handler(struct k_work *work) {
 
    for (int col = 0; col < config->cols; col++) {
      uint16_t ch = config->col_channels[col];
-     // activate mux based on column index (e.g., first 8 columns use mux1_en)
+
+     /* disable both multiplexers, mux output is disabled when enable pin is high */
+     gpio_pin_set_dt(&config->mux0_en.spec, 1);
+     gpio_pin_set_dt(&config->mux1_en.spec, 1);
+     /* MUX channel select */
+     gpio_pin_set_dt(&config->mux_sels.gpios[0].spec, ch & (1 << 0));
+     gpio_pin_set_dt(&config->mux_sels.gpios[1].spec, ch & (1 << 1));
+     gpio_pin_set_dt(&config->mux_sels.gpios[2].spec, ch & (1 << 2));
+
      if (col < 8){
-      /*
-        if col < 8, mux-0 should be used, otherwise mux-1 should be used 
-        disable both multiplexers
-        mux output is disabled when enable pin is high
-      */
-      gpio_pin_set_dt(&config->mux0_en.spec, 1);
-      gpio_pin_set_dt(&config->mux1_en.spec, 1);
-      /* MUX channel select */
-      gpio_pin_set_dt(&config->mux_sels.gpios[0].spec, ch & (1 << 0));
-      gpio_pin_set_dt(&config->mux_sels.gpios[1].spec, ch & (1 << 1));
-      gpio_pin_set_dt(&config->mux_sels.gpios[2].spec, ch & (1 << 2));
-      // enable mux-0
+      /* if col < 8, mux_0 should be used, otherwise mux_1 should be used */
+      // enable mux_0
       gpio_pin_set_dt(&config->mux0_en.spec, 0);
      } else{
-      // disable both multiplexers
-      gpio_pin_set_dt(&config->mux0_en.spec, 1);
-      gpio_pin_set_dt(&config->mux1_en.spec, 1);
-      /* MUX channel select */
-      gpio_pin_set_dt(&config->mux_sels.gpios[0].spec, ch & (1 << 0));
-      gpio_pin_set_dt(&config->mux_sels.gpios[1].spec, ch & (1 << 1));
-      gpio_pin_set_dt(&config->mux_sels.gpios[2].spec, ch & (1 << 2));
-      // enable mux-1
+      // enable mux_1
       gpio_pin_set_dt(&config->mux1_en.spec, 0);
      }
      
@@ -191,13 +181,13 @@ static void kscan_ec_work_handler(struct k_work *work) {
        if (config->row_input_masks && (config->row_input_masks[row] & (1 << col)) != 0) {
          continue;
        }
-       
+       /* adjusted position index in matrix */
        const int index = state_index_rc(config, row, col);
-       /* disable all rows to prevent ghost read */
+       /* disable all rows to prevent ghost read maybe not needed
        for (int row = 0; row < config->rows; row++) {
          gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
        }
-       
+       */
        // --- LOCK ---
        const unsigned int lock = irq_lock();
        // set discharge pin to high impedance
@@ -206,33 +196,34 @@ static void kscan_ec_work_handler(struct k_work *work) {
        gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 1);
        
        // wait for charge, typical 1ns, need to define!!
-       k_busy_wait(2);
+       k_busy_wait(3);
  
        rc = adc_read(config->adc_channel.dev, adc_seq);
        adc_seq->calibrate = false;
  
        if (rc == 0) {
-         matrix_read[index] = data->adc_raw;
-         /* Handle matrix reads */
+         data->matrix_read[index] = data->adc_raw;
+         /* handle matrix reads */
          const bool pressed = data->matrix_state[index];
-         if (!pressed && matrix_read[index] > actuation_threshold[index]) {
+         /* key is pressed, add console output here */
+         if (!pressed && data->matrix_read[index] > actuation_threshold[index]) {
             data->matrix_state[index] = true;
-            /* add console output here */
             data->callback(data->dev, row, col, true);
-          } else if (pressed && matrix_read[index] < release_threshold[index]) {
+          } else if (pressed && data->matrix_read[index] < release_threshold[index]) {
+            /* key is released, need to add console output for debugging */
             data->matrix_state[index] = false;
             data->callback(data->dev, row, col, false);
           }
        } else {
          LOG_ERR("Failed to read ADC: %d", rc);
-         matrix_read[index] = -1;
+         data->matrix_read[index] = 0;
        }
        irq_unlock(lock);
        // -- END LOCK --
  
        /* drive current row low */
        gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
-       /* pull low discharge pin and configure output to drain external circuit */
+       /* pull low discharge pin and configure pin to output to drain external circuit */
        gpio_pin_set_dt(&config->discharge.spec, 0);
        gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
        // wait for discharge, 10ns
@@ -240,8 +231,8 @@ static void kscan_ec_work_handler(struct k_work *work) {
     }
   }
  
-   /* Power off, not needed when not in sleep state */
-   gpio_pin_set_dt(&config->power.spec, 0);
+   /* watch this line, power off, not needed when not in sleep state */
+   //gpio_pin_set_dt(&config->power.spec, 0);
  
    /* Print matrix reads, comment it first */
    /* static int cnt = 0;
@@ -363,14 +354,17 @@ static void kscan_ec_work_handler(struct k_work *work) {
        LISTIFY(INST_MUX_SELS_LEN(n), KSCAN_GPIO_MUX_SEL_CFG_INIT, (, ), n)};    \
                                                                                 \
    static bool kscan_ec_matrix_state_##n[INST_MATRIX_LEN(n)];                   \
+   static uint16_t kscan_ec_matrix_read_##n[INST_MATRIX_LEN(n)];
                                                                                 \
+   /* pointer point to address of first element in array */
    static struct kscan_ec_data kscan_ec_data_##n = {                            \
        .matrix_state = kscan_ec_matrix_state_##n,                               \
+       .matrix_read = kscan_ec_matrix_read_##n,                                 \
    };                                                                           \
                                                                                 \
    COND_CODE_1(                                                                 \
-    DT_INST_NODE_HAS_PROP(n, row-input-masks),                                  \
-    (static const uint32_t row_input_masks_##n[] = DT_INST_PROP(n, row-input-masks);),   \
+    DT_INST_NODE_HAS_PROP(n, row_input_masks),                                  \
+    (static const uint32_t row_input_masks_##n[] = DT_INST_PROP(n, row_input_masks);),   \
     ())                                                                         \
                                                                                 \
    static struct kscan_ec_config kscan_ec_config_##n = {                        \
@@ -379,7 +373,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
        .power = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), power_gpios, 0),          \
        .mux0_en = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), mux0_en_gpios, 0),      \
        .mux1_en = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), mux1_en_gpios, 0),      \
-       COND_CODE_1(DT_INST_NODE_HAS_PROP(n, row-input-masks),                   \
+       COND_CODE_1(DT_INST_NODE_HAS_PROP(n, row_input_masks),                   \
                     (.row_input_masks = row_input_masks_##n, ), ())             \
        .discharge = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), discharge_gpios, 0),  \
        .matrix_warm_up_ms = DT_INST_PROP(n, matrix_warm_up_ms),                 \
