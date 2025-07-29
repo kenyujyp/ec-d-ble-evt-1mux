@@ -204,8 +204,8 @@ static void kscan_ec_work_handler(struct k_work *work) {
        // charge current row
        gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 1);
        
-       // wait for charge, typical 10ns
-       WAIT_CHARGE();
+       // wait for charge, typical 10ns, need to define!!
+       // WAIT_CHARGE();
  
        rc = adc_read(config->adc_channel.dev, adc_seq);
        adc_seq->calibrate = false;
@@ -233,7 +233,8 @@ static void kscan_ec_work_handler(struct k_work *work) {
        gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
        gpio_pin_set_dt(&config->discharge.spec, 0);
        gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
-       WAIT_DISCHARGE();
+       // need to define!!!
+       // WAIT_DISCHARGE();
     }
   }
  
