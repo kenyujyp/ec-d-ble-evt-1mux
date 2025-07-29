@@ -81,8 +81,8 @@
    const uint16_t idle_polling_interval_ms;
    const uint16_t sleep_polling_interval_ms;
 
-   const uint32_t row_input_masks[5];
-   const uint16_t col_channels[];
+   uint32_t row_input_masks[5];
+   uint16_t col_channels[];
    
    
  };
