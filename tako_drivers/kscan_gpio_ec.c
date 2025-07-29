@@ -108,25 +108,33 @@
  }
  
  static int kscan_ec_enable(const struct device *dev) {
-   LOG_DBG("KSCAN EC enable");
- 
-   struct kscan_ec_data *data = dev->data;
-   const struct kscan_ec_config *config = dev->config;
- 
-   k_work_schedule(&data->poll, K_MSEC(data->poll_interval));
-   return 0;
- 
-   return 0;
- }
- 
- static int kscan_ec_disable(const struct device *dev) {
-  LOG_DBG("KSCAN API disable");
+  LOG_DBG("KSCAN EC enable");
+
   struct kscan_ec_data *data = dev->data;
-  k_work_cancel_delayable(&data->poll);
+  const struct kscan_ec_config *config = dev->config;
+
+  k_timer_start(&data->work_timer, K_MSEC(config->active_polling_interval_ms),
+                K_MSEC(config->active_polling_interval_ms));
+
   return 0;
- }
+}
+
+static int kscan_ec_disable(const struct device *dev) {
+  LOG_DBG("KSCAN EC disable");
+
+  struct kscan_ec_data *data = dev->data;
+  k_timer_stop(&data->work_timer);
+
+  return 0;
+}
+
+static void kscan_ec_timer_handler(struct k_timer *timer) {
+  struct kscan_ec_data *data =
+      CONTAINER_OF(timer, struct kscan_ec_data, work_timer);
+  k_work_submit(&data->work);
+}
  
- static void kscan_ec_work_handler(struct k_work *work) {
+static void kscan_ec_work_handler(struct k_work *work) {
 
    struct k_work_delayable *d_work = k_work_delayable_from_work(work);
    struct kscan_ec_data *data = CONTAINER_OF(d_work, struct kscan_ec_data, poll);
@@ -149,7 +157,7 @@
   }
  
    // The board needs some time to be operational after powering up
-   k_sleep(K_MSEC(cfg->matrix_warm_up_ms));
+   k_sleep(K_MSEC(config->matrix_warm_up_ms));
 
    for (int col = 0; col < config->cols; col++) {
      uint16_t ch = config->col_channels[col];
@@ -300,7 +308,7 @@
     gpio_pin_set_dt(&config->mux0_en.spec, GPIO_OUTPUT_INACTIVE);
     gpio_pin_set_dt(&config->mux1_en.spec, GPIO_OUTPUT_INACTIVE);
   
-    data->poll_interval = cfg->active_polling_interval_ms;
+    data->poll_interval = config->active_polling_interval_ms;
     k_work_init_delayable(&data->poll, kscan_ec_timer_handler);
     k_timer_init(&data->work_timer, kscan_ec_timer_handler, NULL);
     k_work_init(&data->work, kscan_ec_work_handler);
