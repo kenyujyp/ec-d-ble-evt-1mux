@@ -58,7 +58,7 @@
  };
  
  struct kscan_ec_config {
-   struct kscan_gpio_list direct;
+   struct kscan_gpio_list row_gpios;
    struct kscan_gpio_list mux_sels;
    struct kscan_gpio power;
    struct kscan_gpio mux0_en; //mux enable GPIO pin
@@ -76,7 +76,8 @@
    const uint16_t idle_polling_interval_ms;
    const uint16_t sleep_polling_interval_ms;
 
-   int32_t col_channels[];
+   const uint16_t col_channels[];
+   const uint32_t row_input_masks[];
    
  };
  
@@ -138,8 +139,8 @@
    /* power on everything */
    gpio_pin_set_dt(&config->power.spec, 1);
 
-   for (int i = 0; i < config->direct.len; i++) {
-    gpio_pin_set_dt(&config->direct.gpios[i].spec, 1);
+   for (int i = 0; i < config->row_gpios.len; i++) {
+    gpio_pin_set_dt(&config->row_gpios.gpios[i].spec, 1);
   }
 
   for (int i = 0; i < config->mux_sels.len; i++) {
@@ -180,14 +181,14 @@
        const int index = state_index_rc(config, row, col);
        /* disable all rows */
        for (int row = 0; row < config->rows; row++) {
-         gpio_pin_set_dt(&config->direct.gpios[row].spec, 0);
+         gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
        }
        
        // --- LOCK ---
        const unsigned int lock = irq_lock();
        // have capacitor charged and set the row pin to high state
        gpio_pin_configure_dt(&config->discharge.spec, GPIO_INPUT);
-       gpio_pin_set_dt(&config->direct.gpios[row].spec, 1);  // enable current row
+       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 1);  // enable current row
  
        // WAIT_CHARGE(); try disabling this line
  
@@ -222,8 +223,8 @@
    /* Power off */
    gpio_pin_set_dt(&config->power.spec, 0);
  
-   for (int i = 0; i < config->direct.len; i++) {
-     gpio_pin_set_dt(&config->direct.gpios[i].spec, 0);
+   for (int i = 0; i < config->row_gpios.len; i++) {
+     gpio_pin_set_dt(&config->row_gpios.gpios[i].spec, 0);
    }
  
    for (int i = 0; i < config->mux_sels.len; i++) {
@@ -284,8 +285,8 @@
     gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT_INACTIVE);
   
     // Init rows
-    for (int i = 0; i < config->direct.len; i++) {
-      gpio_pin_configure_dt(&config->direct.gpios[i].spec, GPIO_OUTPUT_INACTIVE);
+    for (int i = 0; i < config->row_gpios.len; i++) {
+      gpio_pin_configure_dt(&config->row_gpios.gpios[i].spec, GPIO_OUTPUT_INACTIVE);
     }
   
     // Init mux sel
@@ -358,11 +359,12 @@
    };                                                                           \
                                                                                 \
    static struct kscan_ec_config kscan_ec_config_##n = {                        \
-       .direct = KSCAN_GPIO_LIST(kscan_ec_row_gpios_##n),                       \
+       .row_gpios = KSCAN_GPIO_LIST(kscan_ec_row_gpios_##n),                       \
        .mux_sels = KSCAN_GPIO_LIST(kscan_ec_mux_sel_gpios_##n),                 \
        .power = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), power_gpios, 0),          \
        .mux0_en = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), mux0_en_gpios, 0),      \
        .mux1_en = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), mux1_en_gpios, 0),      \
+       .row-input-masks = DT_INST_PROP(n, row-input-masks),                      \
        .discharge = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), discharge_gpios, 0),  \
        .matrix_warm_up_ms = DT_INST_PROP(n, matrix_warm_up_ms),                 \
        .matrix_relax_us = DT_INST_PROP(n, matrix_relax_us),                     \

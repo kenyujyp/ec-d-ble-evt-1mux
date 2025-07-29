@@ -51,3 +51,6 @@ properties:
   sleep-polling-interval-ms:
     type: int
     default: 3000
+  row-input-masks:
+    type: array
+    description: Array of masked inputs for each strobe line. Those set bits are indexes of inputs to skip for each strobe line.
