@@ -242,7 +242,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
     * for (int r = 0; r < config->rows; r++) {
     *   for (int c = 0; c < config->cols; c++) {
     *     const int index = state_index_rc(config, r, c);
-    *     printk("%6d", matrix_read[index]);
+    *     printk("%6d", data->matrix_read[index]);
     *     if (c < config->cols - 1) {
     *       printk(",");
     *     }
