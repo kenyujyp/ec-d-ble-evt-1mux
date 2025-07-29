@@ -374,7 +374,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
        .power = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), power_gpios, 0),          \
        .mux0_en = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), mux0_en_gpios, 0),      \
        .mux1_en = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), mux1_en_gpios, 0),      \
-       .row-input-masks = DT_INST_PROP(n, row-input-masks),                      \
+       .row_input_masks = DT_INST_PROP(n, row-input-masks),                      \
        .discharge = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), discharge_gpios, 0),  \
        .matrix_warm_up_ms = DT_INST_PROP(n, matrix_warm_up_ms),                 \
        .matrix_relax_us = DT_INST_PROP(n, matrix_relax_us),                     \
