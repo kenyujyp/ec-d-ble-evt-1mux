@@ -81,7 +81,7 @@
    const uint16_t idle_polling_interval_ms;
    const uint16_t sleep_polling_interval_ms;
 
-   uint32_t row_input_masks[5];
+   const uint32_t* row_input_masks;
    uint16_t col_channels[];
    
    
@@ -368,13 +368,19 @@ static void kscan_ec_work_handler(struct k_work *work) {
        .matrix_state = kscan_ec_matrix_state_##n,                               \
    };                                                                           \
                                                                                 \
+   COND_CODE_1(                                                                 \
+    DT_INST_NODE_HAS_PROP(n, row-input-masks),                                  \
+    (static const uint32_t row_input_masks_##n[] = DT_INST_PROP(n, row-input-masks);),   \
+    ())                                                                         \
+                                                                                \
    static struct kscan_ec_config kscan_ec_config_##n = {                        \
-       .row_gpios = KSCAN_GPIO_LIST(kscan_ec_row_gpios_##n),                       \
+       .row_gpios = KSCAN_GPIO_LIST(kscan_ec_row_gpios_##n),                    \
        .mux_sels = KSCAN_GPIO_LIST(kscan_ec_mux_sel_gpios_##n),                 \
        .power = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), power_gpios, 0),          \
        .mux0_en = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), mux0_en_gpios, 0),      \
        .mux1_en = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), mux1_en_gpios, 0),      \
-       .row_input_masks = DT_INST_PROP(n, row-input-masks),                      \
+       COND_CODE_1(DT_INST_NODE_HAS_PROP(n, row-input-masks),                   \
+                    (.row_input_masks = row_input_masks_##n, ), ())             \
        .discharge = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), discharge_gpios, 0),  \
        .matrix_warm_up_ms = DT_INST_PROP(n, matrix_warm_up_ms),                 \
        .matrix_relax_us = DT_INST_PROP(n, matrix_relax_us),                     \
