@@ -53,7 +53,7 @@
    kscan_callback_t callback;
    uint16_t poll_interval;
    struct k_work_delayable poll;
-   bool matrix_state[MATRIX_CELLS];
+   bool *matrix_state;
    const struct device *dev;
  };
  
