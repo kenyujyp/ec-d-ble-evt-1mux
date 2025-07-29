@@ -16,6 +16,7 @@
  #include <zmk/events/activity_state_changed.h>
  
  LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
  
  #define DT_DRV_COMPAT zmk_kscan_gpio_ec
  
@@ -199,13 +200,13 @@ static void kscan_ec_work_handler(struct k_work *work) {
        
        // --- LOCK ---
        const unsigned int lock = irq_lock();
-       // have capacitor charged and set the row pin to high state
+       // set discharge pin to high impedance
        gpio_pin_configure_dt(&config->discharge.spec, GPIO_INPUT);
-       // charge current row
+       // set current row pin high
        gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 1);
        
-       // wait for charge, typical 10ns, need to define!!
-       // WAIT_CHARGE();
+       // wait for charge, typical 1ns, need to define!!
+       k_busy_wait(2);
  
        rc = adc_read(config->adc_channel.dev, adc_seq);
        adc_seq->calibrate = false;
@@ -229,12 +230,13 @@ static void kscan_ec_work_handler(struct k_work *work) {
        irq_unlock(lock);
        // -- END LOCK --
  
-       /* drive low current row */
+       /* drive current row low */
        gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
+       /* pull low discharge pin and configure output to drain external circuit */
        gpio_pin_set_dt(&config->discharge.spec, 0);
        gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
-       // need to define!!!
-       // WAIT_DISCHARGE();
+       // wait for discharge, 10ns
+       k_busy_wait(10);
     }
   }
  
