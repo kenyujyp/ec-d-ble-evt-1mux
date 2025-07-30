@@ -354,9 +354,9 @@ static void kscan_ec_work_handler(struct k_work *work) {
        LISTIFY(INST_MUX_SELS_LEN(n), KSCAN_GPIO_MUX_SEL_CFG_INIT, (, ), n)};    \
                                                                                 \
    static bool kscan_ec_matrix_state_##n[INST_MATRIX_LEN(n)];                   \
-   static uint16_t kscan_ec_matrix_read_##n[INST_MATRIX_LEN(n)];
+   static uint16_t kscan_ec_matrix_read_##n[INST_MATRIX_LEN(n)];                \
                                                                                 \
-   /* pointer point to address of first element in array */
+   /* pointer point to address of first element in array */                     \
    static struct kscan_ec_data kscan_ec_data_##n = {                            \
        .matrix_state = kscan_ec_matrix_state_##n,                               \
        .matrix_read = kscan_ec_matrix_read_##n,                                 \
