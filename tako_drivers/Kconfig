@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 # add config options
-
+# compatibility
 DT_COMPAT_ZMK_KSCAN_GPIO_EC := zmk,kscan-gpio-ec
 
 config ZMK_KSCAN_GPIO_EC

@@ -16,7 +16,6 @@
  #include <zmk/events/activity_state_changed.h>
  
  LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
-
  
  #define DT_DRV_COMPAT zmk_kscan_gpio_ec
  
@@ -38,15 +37,15 @@
    3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000,
    3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000,
    3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000,
-   3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000,
+   3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000
  };
  
  const uint16_t release_threshold[] = {
-   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
-   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
-   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
-   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
-   450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450
+   2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800,
+   2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800,
+   2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800,
+   2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800,
+   2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800
  };
  // clang-format on
  
@@ -201,14 +200,21 @@ static void kscan_ec_work_handler(struct k_work *work) {
          data->matrix_read[index] = data->adc_raw;
          /* handle matrix reads */
          const bool pressed = data->matrix_state[index];
-         /* key is pressed, add console output here */
+
          if (!pressed && data->matrix_read[index] > actuation_threshold[index]) {
+            /* key pressed */
             data->matrix_state[index] = true;
-            data->callback(data->dev, row, col, true);
+            /* quick-and-dirty debugging, added more space to frimware size (remove before final build) */
+            printk("key pressed: %d, %d, %u\n", row, col, data->matrix_read[index]);
+            /* uncommment next line for final build */
+            //data->callback(data->dev, row, col, true);
           } else if (pressed && data->matrix_read[index] < release_threshold[index]) {
-            /* key is released, need to add console output for debugging */
+            /* key is released */
             data->matrix_state[index] = false;
-            data->callback(data->dev, row, col, false);
+            /* quick-and-dirty debugging, added more space to frimware size (remove before final build) */
+            printk("key released: %d, %d, %u\n", row, col, data->matrix_read[index]);
+            /* uncommment next line for final build */
+            //data->callback(data->dev, row, col, false);
           }
        } else {
          LOG_ERR("Failed to read ADC: %d", rc);
@@ -229,25 +235,6 @@ static void kscan_ec_work_handler(struct k_work *work) {
  
    /* watch this line, power off, not needed when not in sleep state */
    //gpio_pin_set_dt(&config->power.spec, 0);
- 
-   /* Print matrix reads, comment it first */
-   /* static int cnt = 0;
-    * if (cnt++ >= (300 / config->poll_period_ms)) {
-    * cnt = 0;
-    * 
-    * for (int r = 0; r < config->rows; r++) {
-    *   for (int c = 0; c < config->cols; c++) {
-    *     const int index = state_index_rc(config, r, c);
-    *     printk("%6d", data->matrix_read[index]);
-    *     if (c < config->cols - 1) {
-    *       printk(",");
-    *     }
-    *   }
-    *   printk("\n");
-    * }
-    * printk("\n\n");
-    * }
-    */
  
 }
  
