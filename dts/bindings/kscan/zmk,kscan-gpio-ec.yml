@@ -38,9 +38,6 @@ properties:
   matrix-relax-us:
     type: int
     default: 6
-  adc-read-settle-us:
-    type: int
-    default: 5
   active-polling-interval-ms:
     type: int
     default: 10

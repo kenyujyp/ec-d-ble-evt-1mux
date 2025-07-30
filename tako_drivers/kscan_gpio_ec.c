@@ -58,7 +58,6 @@
   struct k_timer work_timer;
   kscan_callback_t callback;
   bool *matrix_state;
-  uint16_t *matrix_read;
 };
 
  
@@ -76,10 +75,8 @@
  
    const uint16_t matrix_warm_up_ms;
    const uint16_t matrix_relax_us;
-   const uint16_t adc_read_settle_us;
    const uint16_t active_polling_interval_ms;
    const uint16_t idle_polling_interval_ms;
-   const uint16_t sleep_polling_interval_ms;
 
    const uint32_t* row_input_masks;
    uint16_t col_channels[];
@@ -147,99 +144,97 @@ static void kscan_ec_work_handler(struct k_work *work) {
 
   /* adc read status */
   int rc;
+  uint16_t matrix_read;
  
-   /* power on everything */
-   gpio_pin_set_dt(&config->power.spec, 1);
+  /* power on everything */
+  gpio_pin_set_dt(&config->power.spec, 1);
  
-   // The board needs some time to be operational after powering up
-   k_sleep(K_MSEC(config->matrix_warm_up_ms));
+  // The board needs some time to be operational after powering up
+  k_sleep(K_MSEC(config->matrix_warm_up_ms));
 
-   for (int col = 0; col < config->cols; col++) {
-     uint16_t ch = config->col_channels[col];
+  for (int col = 0; col < config->cols; col++) {
+    uint16_t ch = config->col_channels[col];
 
-     /* disable both multiplexers, mux output is disabled when enable pin is high */
-     gpio_pin_set_dt(&config->mux0_en.spec, 1);
-     gpio_pin_set_dt(&config->mux1_en.spec, 1);
-     /* multiplexer channel select */
-     gpio_pin_set_dt(&config->mux_sels.gpios[0].spec, ch & (1 << 0));
-     gpio_pin_set_dt(&config->mux_sels.gpios[1].spec, ch & (1 << 1));
-     gpio_pin_set_dt(&config->mux_sels.gpios[2].spec, ch & (1 << 2));
+    /* disable both multiplexers, mux output is disabled when enable pin is high */
+    gpio_pin_set_dt(&config->mux0_en.spec, 1);
+    gpio_pin_set_dt(&config->mux1_en.spec, 1);
+    /* multiplexer channel select */
+    gpio_pin_set_dt(&config->mux_sels.gpios[0].spec, ch & (1 << 0));
+    gpio_pin_set_dt(&config->mux_sels.gpios[1].spec, ch & (1 << 1));
+    gpio_pin_set_dt(&config->mux_sels.gpios[2].spec, ch & (1 << 2));
 
-     if (col < 8){
+    if (col < 8){
       /* if col < 8, mux_0 should be used, otherwise mux_1 should be used */
       // enable mux_0
       gpio_pin_set_dt(&config->mux0_en.spec, 0);
-     } else{
+    } else{
       // enable mux_1
       gpio_pin_set_dt(&config->mux1_en.spec, 0);
      }
      
-     for (int row = 0; row < config->rows; row++) {
-       
-       /* check if it is masked for this row col, skip it if yes */
-       if (config->row_input_masks && (config->row_input_masks[row] & (1 << col)) != 0) {
-         continue;
-       }
-       /* disable unused rows */
-       for (int r = 0; r < config->rows; r++){
-          if (r != row) {
-            gpio_pin_set_dt(&config->row_gpios.gpios[r].spec, 0);
-          }
-       }
-       /* adjusted position index in matrix */
-       const int index = state_index_rc(config, row, col);
+    for (int row = 0; row < config->rows; row++) {
+      /* check if it is masked for this row col, skip it if yes */
+      if (config->row_input_masks && (config->row_input_masks[row] & (1 << col)) != 0) {
+        continue;
+      }
+      /* disable unused rows */
+      for (int r = 0; r < config->rows; r++){
+        if (r != row) {
+          gpio_pin_set_dt(&config->row_gpios.gpios[r].spec, 0);
+        }
+      }
+      /* adjusted position index in matrix */
+      const int index = state_index_rc(config, row, col);
 
-       // --- LOCK ---
-       const unsigned int lock = irq_lock();
-       // set discharge pin to high impedance
-       gpio_pin_configure_dt(&config->discharge.spec, GPIO_INPUT);
-       // set current row pin high
-       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 1);
-       
-       // wait for charge, typical 1ns, need to define!!
-       k_busy_wait(3);
+      // --- LOCK ---
+      const unsigned int lock = irq_lock();
+      // set discharge pin to high impedance
+      gpio_pin_configure_dt(&config->discharge.spec, GPIO_INPUT);
+      // set current row pin high
+      gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 1);
+      // wait for charge, typical 1ns, need to define!!
+      k_busy_wait(3);
  
-       rc = adc_read(config->adc_channel.dev, adc_seq);
-       adc_seq->calibrate = false;
+      rc = adc_read(config->adc_channel.dev, adc_seq);
+      adc_seq->calibrate = false;
  
-       if (rc == 0) {
-         data->matrix_read[index] = data->adc_raw;
-         /* handle matrix reads */
-         const bool pressed = data->matrix_state[index];
+      if (rc == 0) {
+        matrix_read = data->adc_raw;
+      } else {
+        LOG_ERR("Failed to read ADC: %d", rc);
+      }
+      irq_unlock(lock);
+      // -- END LOCK --
+      /* handle matrix reads */
+      const bool pressed = data->matrix_state[index];
 
-         if (!pressed && data->matrix_read[index] > actuation_threshold[index]) {
-            /* key pressed */
-            data->matrix_state[index] = true;
-            /* quick-and-dirty debugging, added more space to frimware size (remove before final build) */
-            printk("key pressed: %d, %d, %u\n", row, col, data->matrix_read[index]);
-            /* uncommment next line for final build */
-            //data->callback(data->dev, row, col, true);
-          } else if (pressed && data->matrix_read[index] < release_threshold[index]) {
-            /* key is released */
-            data->matrix_state[index] = false;
-            /* quick-and-dirty debugging, added more space to frimware size (remove before final build) */
-            printk("key released: %d, %d, %u\n", row, col, data->matrix_read[index]);
-            /* uncommment next line for final build */
-            //data->callback(data->dev, row, col, false);
-          }
-       } else {
-         LOG_ERR("Failed to read ADC: %d", rc);
-         data->matrix_read[index] = 0;
-       }
-       irq_unlock(lock);
-       // -- END LOCK --
+      if (!pressed && matrix_read > actuation_threshold[index]) {
+        /* key pressed */
+        data->matrix_state[index] = true;
+        /* quick-and-dirty debugging, added more space to frimware size (remove before final build) */
+        printk("key pressed: %d, %d, %u\n", row, col, matrix_read);
+        /* uncommment next line for final build */
+        //data->callback(data->dev, row, col, true);
+      } else if (pressed && matrix_read < release_threshold[index]) {
+        /* key is released */
+        data->matrix_state[index] = false;
+        /* quick-and-dirty debugging, added more space to frimware size (remove before final build) */
+        printk("key released: %d, %d, %u\n", row, col, matrix_read);
+        /* uncommment next line for final build */
+        //data->callback(data->dev, row, col, false);
+      }
  
-       /* drive current row low */
-       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
-       /* pull low discharge pin and configure pin to output to drain external circuit */
-       gpio_pin_set_dt(&config->discharge.spec, 0);
-       gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
-       // wait for discharge, 10ns
-       k_busy_wait(10);
+      /* drive current row low */
+      gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
+      /* pull low discharge pin and configure pin to output to drain external circuit */
+      gpio_pin_set_dt(&config->discharge.spec, 0);
+      gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
+      // wait for discharge, 10ns
+      k_busy_wait(10);
     }
   }
    /* watch this line, power off, not needed when not in sleep state */
-   //gpio_pin_set_dt(&config->power.spec, 0);
+   gpio_pin_set_dt(&config->power.spec, 0);
 }
  
  static int kscan_ec_init(const struct device *dev) {
@@ -316,8 +311,9 @@ static void kscan_ec_work_handler(struct k_work *work) {
      poll_period = config->idle_polling_interval_ms;
      break;
    case ZMK_ACTIVITY_SLEEP:
-     poll_period = config->sleep_polling_interval_ms;
-     break;
+     /* COMPLETELY STOP POLLING IN SLEEP STATE */
+     k_timer_stop(&data->work_timer);  // Stop any existing timer
+     return 0;  // Exit early without restarting timer
    default:
      LOG_WRN("Unsupported activity state: %d", ev->state);
      return -EINVAL;
@@ -341,12 +337,10 @@ static void kscan_ec_work_handler(struct k_work *work) {
        LISTIFY(INST_MUX_SELS_LEN(n), KSCAN_GPIO_MUX_SEL_CFG_INIT, (, ), n)};    \
                                                                                 \
    static bool kscan_ec_matrix_state_##n[INST_MATRIX_LEN(n)];                   \
-   static uint16_t kscan_ec_matrix_read_##n[INST_MATRIX_LEN(n)];                \
                                                                                 \
    /* pointer point to address of first element in array */                     \
    static struct kscan_ec_data kscan_ec_data_##n = {                            \
        .matrix_state = kscan_ec_matrix_state_##n,                               \
-       .matrix_read = kscan_ec_matrix_read_##n,                                 \
    };                                                                           \
                                                                                 \
    COND_CODE_1(                                                                 \
@@ -365,10 +359,8 @@ static void kscan_ec_work_handler(struct k_work *work) {
        .discharge = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), discharge_gpios, 0),  \
        .matrix_warm_up_ms = DT_INST_PROP(n, matrix_warm_up_ms),                 \
        .matrix_relax_us = DT_INST_PROP(n, matrix_relax_us),                     \
-       .adc_read_settle_us = DT_INST_PROP(n, adc_read_settle_us),               \
        .active_polling_interval_ms = DT_INST_PROP(n, active_polling_interval_ms),      \
        .idle_polling_interval_ms = DT_INST_PROP(n, idle_polling_interval_ms),   \
-       .sleep_polling_interval_ms = DT_INST_PROP(n, sleep_polling_interval_ms), \
        .col_channels = DT_INST_PROP(n, col_channels),                           \
        .rows = INST_ROWS_LEN(n),                                                \
        .cols = INST_COL_CHANNELS_LEN(n),                                        \
