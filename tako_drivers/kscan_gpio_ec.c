@@ -160,7 +160,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
      /* disable both multiplexers, mux output is disabled when enable pin is high */
      gpio_pin_set_dt(&config->mux0_en.spec, 1);
      gpio_pin_set_dt(&config->mux1_en.spec, 1);
-     /* MUX channel select */
+     /* multiplexer channel select */
      gpio_pin_set_dt(&config->mux_sels.gpios[0].spec, ch & (1 << 0));
      gpio_pin_set_dt(&config->mux_sels.gpios[1].spec, ch & (1 << 1));
      gpio_pin_set_dt(&config->mux_sels.gpios[2].spec, ch & (1 << 2));
@@ -179,6 +179,12 @@ static void kscan_ec_work_handler(struct k_work *work) {
        /* check if it is masked for this row col, skip it if yes */
        if (config->row_input_masks && (config->row_input_masks[row] & (1 << col)) != 0) {
          continue;
+       }
+       /* disable unused rows */
+       for (int r = 0; r < config->rows; r++){
+          if (r != row) {
+            gpio_pin_set_dt(&config->row_gpios.gpios[r].spec, 0);
+          }
        }
        /* adjusted position index in matrix */
        const int index = state_index_rc(config, row, col);
@@ -232,10 +238,8 @@ static void kscan_ec_work_handler(struct k_work *work) {
        k_busy_wait(10);
     }
   }
- 
    /* watch this line, power off, not needed when not in sleep state */
    //gpio_pin_set_dt(&config->power.spec, 0);
- 
 }
  
  static int kscan_ec_init(const struct device *dev) {
