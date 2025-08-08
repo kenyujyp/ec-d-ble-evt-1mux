@@ -220,7 +220,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
     }
   }
    /* watch this line, power off, not needed when not in sleep state */
-   gpio_pin_set_dt(&config->power.spec, 0);
+   //gpio_pin_set_dt(&config->power.spec, 0);
 }
  
  static int kscan_ec_init(const struct device *dev) {
@@ -234,7 +234,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
     LOG_WRN("EC Channel: %d", config->adc_channel.channel_cfg.channel_id);
     LOG_WRN("EC Channel 2: %d", config->adc_channel.channel_id);
   
-    gpio_pin_configure_dt(&config->power.spec, GPIO_OUTPUT_INACTIVE);
+    //gpio_pin_configure_dt(&config->power.spec, GPIO_OUTPUT_INACTIVE);
   
     data->dev = dev;
   
