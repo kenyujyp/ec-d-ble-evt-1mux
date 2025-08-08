@@ -17,9 +17,6 @@ properties:
   mux0-en-gpios:
     type: phandle-array
     required: true
-  mux1-en-gpios:
-    type: phandle-array
-    required: true
   discharge-gpios:
     type: phandle-array
     required: true
@@ -28,9 +25,6 @@ properties:
     required: true
   col-channels:
     type: array
-    required: true
-  power-gpios:
-    type: phandle-array
     required: true
   matrix-warm-up-ms:
     type: int

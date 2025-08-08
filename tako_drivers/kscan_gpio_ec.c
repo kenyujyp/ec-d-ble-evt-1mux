@@ -33,19 +33,13 @@
  // clang-format off
  
  const uint16_t actuation_threshold[] = {
-   3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000,
-   3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000,
-   3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000,
-   3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000,
-   3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000
+   3000, 3000, 3000, 3000,
+   3000, 3000, 3000, 3000
  };
  
  const uint16_t release_threshold[] = {
-   2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800,
-   2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800,
-   2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800,
-   2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800,
-   2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800, 2800
+   2800, 2800, 2800, 2800,
+   2800, 2800, 2800, 2800
  };
  // clang-format on
  
@@ -64,9 +58,7 @@
  struct kscan_ec_config {
    struct kscan_gpio_list row_gpios;
    struct kscan_gpio_list mux_sels;
-   struct kscan_gpio power;
    struct kscan_gpio mux0_en; //mux enable GPIO pin
-   struct kscan_gpio mux1_en; //mux enable GPIO pin
    struct kscan_gpio discharge;
    struct adc_dt_spec adc_channel;
  
@@ -157,32 +149,26 @@ static void kscan_ec_work_handler(struct k_work *work) {
 
     /* disable both multiplexers, mux output is disabled when enable pin is high */
     gpio_pin_set_dt(&config->mux0_en.spec, 1);
-    gpio_pin_set_dt(&config->mux1_en.spec, 1);
     /* multiplexer channel select */
     gpio_pin_set_dt(&config->mux_sels.gpios[0].spec, ch & (1 << 0));
     gpio_pin_set_dt(&config->mux_sels.gpios[1].spec, ch & (1 << 1));
     gpio_pin_set_dt(&config->mux_sels.gpios[2].spec, ch & (1 << 2));
 
-    if (col < 8){
-      /* if col < 8, mux_0 should be used, otherwise mux_1 should be used */
-      // enable mux_0
-      gpio_pin_set_dt(&config->mux0_en.spec, 0);
-    } else{
-      // enable mux_1
-      gpio_pin_set_dt(&config->mux1_en.spec, 0);
-     }
+    // enable mux_0
+    gpio_pin_set_dt(&config->mux0_en.spec, 0);
      
     for (int row = 0; row < config->rows; row++) {
       /* check if it is masked for this row col, skip it if yes */
       if (config->row_input_masks && (config->row_input_masks[row] & (1 << col)) != 0) {
         continue;
       }
-      /* disable unused rows */
+      /* disable unused rows
       for (int r = 0; r < config->rows; r++){
         if (r != row) {
           gpio_pin_set_dt(&config->row_gpios.gpios[r].spec, 0);
         }
       }
+      */
       /* adjusted position index in matrix */
       const int index = state_index_rc(config, row, col);
 
@@ -205,6 +191,11 @@ static void kscan_ec_work_handler(struct k_work *work) {
       }
       irq_unlock(lock);
       // -- END LOCK --
+      /* drive current row low */
+      gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
+      /* pull low discharge pin and configure pin to output to drain external circuit */
+      gpio_pin_set_dt(&config->discharge.spec, 0);
+      gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
       /* handle matrix reads */
       const bool pressed = data->matrix_state[index];
 
@@ -223,12 +214,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
         /* uncommment next line for final build */
         //data->callback(data->dev, row, col, false);
       }
- 
-      /* drive current row low */
-      gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
-      /* pull low discharge pin and configure pin to output to drain external circuit */
-      gpio_pin_set_dt(&config->discharge.spec, 0);
-      gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
+      
       // wait for discharge, 10ns
       k_busy_wait(10);
     }
@@ -282,7 +268,6 @@ static void kscan_ec_work_handler(struct k_work *work) {
   
     // Init both muxes
     gpio_pin_set_dt(&config->mux0_en.spec, GPIO_OUTPUT_INACTIVE);
-    gpio_pin_set_dt(&config->mux1_en.spec, GPIO_OUTPUT_INACTIVE);
   
     k_timer_init(&data->work_timer, kscan_ec_timer_handler, NULL);
     k_work_init(&data->work, kscan_ec_work_handler);
@@ -351,9 +336,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
    static struct kscan_ec_config kscan_ec_config_##n = {                        \
        .row_gpios = KSCAN_GPIO_LIST(kscan_ec_row_gpios_##n),                    \
        .mux_sels = KSCAN_GPIO_LIST(kscan_ec_mux_sel_gpios_##n),                 \
-       .power = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), power_gpios, 0),          \
        .mux0_en = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), mux0_en_gpios, 0),      \
-       .mux1_en = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), mux1_en_gpios, 0),      \
        COND_CODE_1(DT_INST_NODE_HAS_PROP(n, row_input_masks),                   \
                     (.row_input_masks = row_input_masks_##n, ), ())             \
        .discharge = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), discharge_gpios, 0),  \
