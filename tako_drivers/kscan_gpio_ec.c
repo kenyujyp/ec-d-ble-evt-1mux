@@ -139,7 +139,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
   uint16_t matrix_read;
  
   /* power on everything */
-  gpio_pin_set_dt(&config->power.spec, 1);
+  // gpio_pin_set_dt(&config->power.spec, 1);
  
   // The board needs some time to be operational after powering up
   k_sleep(K_MSEC(config->matrix_warm_up_ms));
