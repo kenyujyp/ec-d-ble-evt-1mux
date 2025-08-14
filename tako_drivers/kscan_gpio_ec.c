@@ -200,8 +200,8 @@ static void kscan_ec_work_handler(struct k_work *work) {
       /* drive current row low */
       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
       /* pull low discharge pin and configure pin to output to drain external circuit */
-      gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
       gpio_pin_set_dt(&config->discharge.spec, 0);
+      gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
       
       /* handle matrix reads */
       const bool pressed = data->matrix_state[index];
