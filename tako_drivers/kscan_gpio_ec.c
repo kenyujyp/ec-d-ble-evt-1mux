@@ -41,6 +41,11 @@
    2800, 2800, 2800, 2800,
    2800, 2800, 2800, 2800
  };
+
+ uint16_t noise_floor[] = {
+  500, 500, 500, 500,
+  500, 500, 500, 500
+};
  // clang-format on
  
  struct kscan_ec_data {
@@ -179,7 +184,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
       // set current row pin high
       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 1);
       // wait for charge, typical 1ns, need to define!!
-      k_busy_wait(3);
+      k_busy_wait(10);
  
       rc = adc_read(config->adc_channel.dev, adc_seq);
       adc_seq->calibrate = false;
@@ -199,28 +204,37 @@ static void kscan_ec_work_handler(struct k_work *work) {
       /* handle matrix reads */
       const bool pressed = data->matrix_state[index];
 
-      if (!pressed && matrix_read > actuation_threshold[index]) {
+      /* print reading for debugging, uncomment in final build */
+      printk("reading: %d, %d, %u\n", row, col, matrix_read);
+
+      /* real time noise floor calibration */
+      if (matrix_read < noise_floor[index]) {
+        /* update noise floor */
+        noise_floor[index] = matrix_read;
+        /* quick-and-dirty debugging, added more space to frimware size (remove before final build) */
+        printk("noise floor changed: %d, %d, %u\n", row, col, matrix_read);
+      }
+
+      if (!pressed && matrix_read > (actuation_threshold[index] + noise_floor[index])) {
         /* key pressed */
         data->matrix_state[index] = true;
         /* quick-and-dirty debugging, added more space to frimware size (remove before final build) */
-        printk("key pressed: %d, %d, %u\n", row, col, matrix_read);
+        printk("key pressed: %d, %d, %u, %u\n", row, col, noise_floor[index], matrix_read, );
         /* uncommment next line for final build */
         //data->callback(data->dev, row, col, true);
-      } else if (pressed && matrix_read < release_threshold[index]) {
+      } else if (pressed && matrix_read < (release_threshold[index] + noise_floor[index])) {
         /* key is released */
         data->matrix_state[index] = false;
         /* quick-and-dirty debugging, added more space to frimware size (remove before final build) */
-        printk("key released: %d, %d, %u\n", row, col, matrix_read);
+        printk("key released: %d, %d, %u, %u\n", row, col, noise_floor[index], matrix_read);
         /* uncommment next line for final build */
         //data->callback(data->dev, row, col, false);
       }
       
       // wait for discharge, 10ns
-      k_busy_wait(10);
+      k_busy_wait(20);
     }
   }
-   /* watch this line, power off, not needed when not in sleep state */
-   //gpio_pin_set_dt(&config->power.spec, 0);
 }
  
  static int kscan_ec_init(const struct device *dev) {
