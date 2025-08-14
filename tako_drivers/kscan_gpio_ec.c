@@ -181,7 +181,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
       const unsigned int lock = irq_lock();
       // set discharge pin to high impedance
       gpio_pin_configure_dt(&config->discharge.spec, GPIO_INPUT);
-      gpio_pin_set_dt(&config->discharge.spec, 1);
+      //gpio_pin_set_dt(&config->discharge.spec, 1);
       // set current row pin high
       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 1);
       // wait for charge, typical 1ns, need to define!!
