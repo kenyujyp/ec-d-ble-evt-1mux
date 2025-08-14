@@ -33,13 +33,13 @@
  // clang-format off
  
  const uint16_t actuation_threshold[] = {
-   1000, 1000, 1000, 1000,
-   1000, 1000, 1000, 1000
+   3000, 3000, 3000, 3000,
+   3000, 3000, 3000, 3000
  };
  
  const uint16_t release_threshold[] = {
-   800, 800, 800, 800,
-   800, 800, 800, 800
+   2500, 2500, 2500, 2500,
+   2500, 2500, 2500, 2500
  };
 
  uint16_t noise_floor[] = {
@@ -51,7 +51,7 @@
  struct kscan_ec_data {
   const struct device *dev;
   struct adc_sequence adc_seq;
-  uint16_t adc_raw;   // could be 
+  int16_t adc_raw;   // could be 
 
   struct k_work work;
   struct k_timer work_timer;
@@ -139,9 +139,9 @@ static void kscan_ec_work_handler(struct k_work *work) {
   const struct kscan_ec_config *config = data->dev->config;
   struct adc_sequence *adc_seq = &data->adc_seq;
 
-  /* adc read status */
+  /* adc read status, first check int type */
   int rc;
-  uint16_t matrix_read;
+  int16_t matrix_read;
  
   /* power on everything */
   // gpio_pin_set_dt(&config->power.spec, 1);
@@ -220,14 +220,14 @@ static void kscan_ec_work_handler(struct k_work *work) {
         /* key pressed */
         data->matrix_state[index] = true;
         /* quick-and-dirty debugging, added more space to frimware size (remove before final build) */
-        printk("key pressed: %d, %d, %u, %u\n", row, col, noise_floor[index], matrix_read);
+        printk("key pressed: %d, %d, %u, %u\n", row, col, matrix_read, noise_floor[index]);
         /* uncommment next line for final build */
         //data->callback(data->dev, row, col, true);
       } else if (pressed && matrix_read < (release_threshold[index] + noise_floor[index])) {
         /* key is released */
         data->matrix_state[index] = false;
         /* quick-and-dirty debugging, added more space to frimware size (remove before final build) */
-        printk("key released: %d, %d, %u, %u\n", row, col, noise_floor[index], matrix_read);
+        printk("key released: %d, %d, %u, %u\n", row, col, matrix_read, noise_floor[index]);
         /* uncommment next line for final build */
         //data->callback(data->dev, row, col, false);
       }
