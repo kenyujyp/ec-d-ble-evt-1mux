@@ -43,15 +43,15 @@
  };
 
  uint16_t noise_floor[] = {
-  500, 500, 500, 500,
-  500, 500, 500, 500
+  1000, 1000, 1000, 1000,
+  1000, 1000, 1000, 1000
 };
  // clang-format on
  
  struct kscan_ec_data {
   const struct device *dev;
   struct adc_sequence adc_seq;
-  int16_t adc_raw;
+  uint16_t adc_raw;   // could be 
 
   struct k_work work;
   struct k_timer work_timer;
@@ -155,9 +155,9 @@ static void kscan_ec_work_handler(struct k_work *work) {
     /* disable both multiplexers, mux output is disabled when enable pin is high */
     gpio_pin_set_dt(&config->mux0_en.spec, 1);
     /* multiplexer channel select */
-    gpio_pin_set_dt(&config->mux_sels.gpios[0].spec, ch & (1 << 0));
-    gpio_pin_set_dt(&config->mux_sels.gpios[1].spec, ch & (1 << 1));
-    gpio_pin_set_dt(&config->mux_sels.gpios[2].spec, ch & (1 << 2));
+    for (uint8_t i = 0; i < 3; i++) {
+      gpio_pin_set_dt(&config->mux_sels.gpios[i].spec, ch & (1 << i));
+    }
 
     // enable mux_0
     gpio_pin_set_dt(&config->mux0_en.spec, 0);
@@ -167,13 +167,13 @@ static void kscan_ec_work_handler(struct k_work *work) {
       if (config->row_input_masks && (config->row_input_masks[row] & (1 << col)) != 0) {
         continue;
       }
-      /* disable unused rows
+      /* disable unused rows */
       for (int r = 0; r < config->rows; r++){
         if (r != row) {
           gpio_pin_set_dt(&config->row_gpios.gpios[r].spec, 0);
         }
       }
-      */
+
       /* adjusted position index in matrix */
       const int index = state_index_rc(config, row, col);
 
@@ -181,6 +181,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
       const unsigned int lock = irq_lock();
       // set discharge pin to high impedance
       gpio_pin_configure_dt(&config->discharge.spec, GPIO_INPUT);
+      gpio_pin_set_dt(&config->discharge.spec, 1);
       // set current row pin high
       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 1);
       // wait for charge, typical 1ns, need to define!!
@@ -199,13 +200,14 @@ static void kscan_ec_work_handler(struct k_work *work) {
       /* drive current row low */
       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
       /* pull low discharge pin and configure pin to output to drain external circuit */
-      gpio_pin_set_dt(&config->discharge.spec, 0);
       gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
+      gpio_pin_set_dt(&config->discharge.spec, 0);
+      
       /* handle matrix reads */
       const bool pressed = data->matrix_state[index];
 
       /* print reading for debugging, uncomment in final build */
-      printk("reading: %d, %d, %u\n", row, col, matrix_read);
+      printk("reading: %d, %d, %u, %u\n", row, col, matrix_read, noise_floor[index]);
 
       /* real time noise floor calibration */
       if (matrix_read < noise_floor[index]) {
@@ -232,7 +234,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
       }
       
       // wait for discharge, 10ns
-      k_busy_wait(20);
+      k_busy_wait(10);
     }
   }
 }
