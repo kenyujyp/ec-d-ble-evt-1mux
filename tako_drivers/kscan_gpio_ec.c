@@ -219,7 +219,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
         /* key pressed */
         data->matrix_state[index] = true;
         /* quick-and-dirty debugging, added more space to frimware size (remove before final build) */
-        printk("key pressed: %d, %d, %u, %u\n", row, col, noise_floor[index], matrix_read, );
+        printk("key pressed: %d, %d, %u, %u\n", row, col, noise_floor[index], matrix_read);
         /* uncommment next line for final build */
         //data->callback(data->dev, row, col, true);
       } else if (pressed && matrix_read < (release_threshold[index] + noise_floor[index])) {
