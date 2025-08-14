@@ -151,22 +151,21 @@ static void kscan_ec_work_handler(struct k_work *work) {
 
   for (int col = 0; col < config->cols; col++) {
     uint16_t ch = config->col_channels[col];
-
-    /* disable both multiplexers, mux output is disabled when enable pin is high */
-    gpio_pin_set_dt(&config->mux0_en.spec, 1);
-    /* multiplexer channel select */
-    for (uint8_t i = 0; i < 3; i++) {
-      gpio_pin_set_dt(&config->mux_sels.gpios[i].spec, ch & (1 << i));
-    }
-
-    // enable mux_0
-    gpio_pin_set_dt(&config->mux0_en.spec, 0);
      
     for (int row = 0; row < config->rows; row++) {
       /* check if it is masked for this row col, skip it if yes */
       if (config->row_input_masks && (config->row_input_masks[row] & (1 << col)) != 0) {
         continue;
       }
+      /* disable both multiplexers, mux output is disabled when enable pin is high */
+      gpio_pin_set_dt(&config->mux0_en.spec, 1);
+      /* multiplexer channel select */
+      for (uint8_t i = 0; i < 3; i++) {
+        gpio_pin_set_dt(&config->mux_sels.gpios[i].spec, ch & (1 << i));
+      }
+      // reenable mux_0
+      gpio_pin_set_dt(&config->mux0_en.spec, 0);
+
       /* disable unused rows */
       for (int r = 0; r < config->rows; r++){
         if (r != row) {
