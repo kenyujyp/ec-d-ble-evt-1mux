@@ -33,8 +33,8 @@
  // clang-format off
  
  const uint16_t actuation_threshold[] = {
-   3000, 3000, 3000, 3000,
-   3000, 3000, 3000, 3000
+   3500, 3500, 3500, 3500,
+   3500, 3500, 3500, 3500
  };
  
  const uint16_t release_threshold[] = {
@@ -141,7 +141,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
 
   /* adc read status, first check int type */
   int rc;
-  int16_t matrix_read;
+  int16_t matrix_read = 0;
  
   /* power on everything */
   // gpio_pin_set_dt(&config->power.spec, 1);
@@ -199,15 +199,18 @@ static void kscan_ec_work_handler(struct k_work *work) {
       /* drive current row low */
       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
       /* pull low discharge pin and configure pin to output to drain external circuit */
-      gpio_pin_set_dt(&config->discharge.spec, 0);
+      
       gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
+      gpio_pin_set_dt(&config->discharge.spec, 0);
       
       /* handle matrix reads */
       const bool pressed = data->matrix_state[index];
 
       /* print reading for debugging, uncomment in final build */
       printk("reading: %d, %d, %u, %u\n", row, col, matrix_read, noise_floor[index]);
-
+      if (matrix_read < 0) {
+        matrix_read = matrix_read * (-1);
+      }
       /* real time noise floor calibration */
       if (matrix_read < noise_floor[index]) {
         /* update noise floor */
