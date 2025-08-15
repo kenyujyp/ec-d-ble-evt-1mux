@@ -51,7 +51,7 @@
  struct kscan_ec_data {
   const struct device *dev;
   struct adc_sequence adc_seq;
-  int16_t adc_raw;   // could be 
+  uint16_t adc_raw;   // could be 
 
   struct k_work work;
   struct k_timer work_timer;
@@ -141,7 +141,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
 
   /* adc read status, first check int type */
   int rc;
-  int16_t matrix_read = 0;
+  uint16_t matrix_read = 0;
  
   /* power on everything */
   // gpio_pin_set_dt(&config->power.spec, 1);
