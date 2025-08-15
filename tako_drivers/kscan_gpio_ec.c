@@ -189,8 +189,9 @@ static void kscan_ec_work_handler(struct k_work *work) {
       rc = adc_read(config->adc_channel.dev, adc_seq);
       adc_seq->calibrate = false;
  
+      // shift 4 for correct range value
       if (rc == 0) {
-        matrix_read = data->adc_raw;
+        matrix_read = (data->adc_raw >> 4);
       } else {
         LOG_ERR("Failed to read ADC: %d", rc);
       }
@@ -206,9 +207,6 @@ static void kscan_ec_work_handler(struct k_work *work) {
       /* handle matrix reads */
       const bool pressed = data->matrix_state[index];
 
-      if (matrix_read < 0) {
-        matrix_read = matrix_read * (-1);
-      }
       /* print reading for debugging, uncomment in final build */
       printk("reading: %d, %d, %u, %u\n", row, col, matrix_read, noise_floor[index]);
       
