@@ -33,18 +33,18 @@
  // clang-format off
  
  const uint16_t actuation_threshold[] = {
-   3500, 3500, 3500, 3500,
-   3500, 3500, 3500, 3500
+   800, 800, 800, 800,
+   800, 800, 800, 800
  };
  
  const uint16_t release_threshold[] = {
-   2500, 2500, 2500, 2500,
-   2500, 2500, 2500, 2500
+   600, 600, 600, 600,
+   600, 600, 600, 600
  };
 
  uint16_t noise_floor[] = {
-  2500, 2500, 2500, 2500,
-  2500, 2500, 2500, 2500
+  500, 500, 500, 500,
+  500, 500, 500, 500
 };
  // clang-format on
  
@@ -157,14 +157,14 @@ static void kscan_ec_work_handler(struct k_work *work) {
       if (config->row_input_masks && (config->row_input_masks[row] & (1 << col)) != 0) {
         continue;
       }
+
       /* disable both multiplexers, mux output is disabled when enable pin is high */
       gpio_pin_set_dt(&config->mux0_en.spec, 1);
+
       /* multiplexer channel select */
       for (uint8_t i = 0; i < 3; i++) {
         gpio_pin_set_dt(&config->mux_sels.gpios[i].spec, ch & (1 << i));
       }
-      // reenable mux_0
-      gpio_pin_set_dt(&config->mux0_en.spec, 0);
 
       /* disable unused rows */
       for (int r = 0; r < config->rows; r++){
@@ -184,9 +184,13 @@ static void kscan_ec_work_handler(struct k_work *work) {
       // set current row pin high
       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 1);
       // wait for charge, typical 1ns, need to define!!
-      k_busy_wait(10);
- 
+      k_busy_wait(5);
+      // reenable mux_0
+      gpio_pin_set_dt(&config->mux0_en.spec, 0);
+
+      /* read adc */
       rc = adc_read(config->adc_channel.dev, adc_seq);
+
       adc_seq->calibrate = false;
  
       // shift 4 for correct range value
@@ -330,7 +334,8 @@ static void kscan_ec_work_handler(struct k_work *work) {
  static const struct kscan_driver_api kscan_ec_api = {
      .config = kscan_ec_configure,
      .enable_callback = kscan_ec_enable,
-     .disable_callback = kscan_ec_disable};
+     .disable_callback = kscan_ec_disable
+ };
  
  #define KSCAN_EC_INIT(n)                                                       \
    static struct kscan_gpio kscan_ec_row_gpios_##n[] = {                        \
