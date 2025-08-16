@@ -273,12 +273,12 @@ static void kscan_ec_work_handler(struct k_work *work) {
     gpio_pin_configure_dt(&config->discharge, GPIO_OUTPUT);
   
     // Init rows
-    for (int i = 0; i < config->row_gpios.len; i++) {
+    for (int i = 0; i < config->rows; i++) {
       gpio_pin_configure_dt(&config->row_gpios[i], GPIO_OUTPUT);
     }
   
     // Init mux sel
-    for (int i = 0; i < config->mux_sels.len; i++) {
+    for (int i = 0; i < 3; i++) {
       gpio_pin_configure_dt(&config->mux_sels[i],
                             GPIO_OUTPUT);
     }
