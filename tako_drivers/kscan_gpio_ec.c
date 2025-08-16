@@ -19,10 +19,9 @@
  
  #define DT_DRV_COMPAT zmk_kscan_gpio_ec
  
- #define INST_ROWS_LEN(n) 
- #define INST_MUX_SELS_LEN(n) 
+ #define INST_ROWS_LEN(n) DT_INST_PROP_LEN(n, row_gpios)
+ #define INST_MUX_SELS_LEN(n) DT_INST_PROP_LEN(n, mux_sel_gpios)
  #define INST_COL_CHANNELS_LEN(n) DT_INST_PROP_LEN(n, col_channels)
-
  
  #define INST_MATRIX_LEN(n) (INST_ROWS_LEN(n) * INST_COL_CHANNELS_LEN(n))
  
@@ -367,7 +366,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
        .idle_polling_interval_ms = DT_INST_PROP(n, idle_polling_interval_ms),   \
        .col_channels = DT_INST_PROP(n, col_channels),                           \
        .rows = DT_INST_PROP_LEN(n, row_gpios),                                  \
-       .cols = DT_INST_PROP_LEN(n, mux_sel_gpios)                               \
+       .cols = DT_INST_PROP_LEN(n, col_channels),                               \
        .adc_channel = ADC_DT_SPEC_INST_GET(n),                                  \
    };                                                                           \
    static int kscan_ec_activity_event_handler_wrapper##n(                       \
