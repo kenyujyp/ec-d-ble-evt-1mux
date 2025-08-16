@@ -207,7 +207,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
         LOG_ERR("Failed to read ADC: %d", rc);
       }
       /* print reading for debugging, uncomment in final build */
-      //printk("reading: %d, %d, %u, %u\n", row, col, matrix_read, noise_floor[index]);
+      printk("reading: %d, %d, %u, %u\n", row, col, matrix_read, noise_floor[index]);
       
       /* real time noise floor calibration */
       if (matrix_read < noise_floor[index]) {
