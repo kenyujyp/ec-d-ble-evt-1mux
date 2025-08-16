@@ -160,8 +160,8 @@ static void kscan_ec_work_handler(struct k_work *work) {
       gpio_pin_set_dt(&config->row_gpios.gpios[row], 0);   // disable current row
 
       /* disable both multiplexers, mux output is disabled when enable pin is high */
-      //gpio_pin_set_dt(&config->mux0_en, 0);  // drive high, active low
-      gpio_pin_configure_dt(&config->mux0_en, GPIO_INPUT);
+      gpio_pin_set_dt(&config->mux0_en, 0);  // drive high, active low
+      //gpio_pin_configure_dt(&config->mux0_en, GPIO_INPUT);
 
       /* multiplexer channel select */
       for (uint8_t i = 0; i < 3; i++) {
