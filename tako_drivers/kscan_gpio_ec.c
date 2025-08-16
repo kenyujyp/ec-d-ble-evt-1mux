@@ -332,7 +332,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
      .disable_callback = kscan_ec_disable
  };
  
- #define ZKEM_GPIO_DT_SPEC_ELEM(n, prop, idx) GPIO_DT_SPEC_GET_BY_IDX(n, prop, idx)
+ #define ZKEM_GPIO_DT_SPEC_ELEM(n, prop, idx) GPIO_DT_SPEC_GET_BY_IDX(n, prop, idx),
 
  #define KSCAN_EC_INIT(n)                                                       \
                                                                                 \
