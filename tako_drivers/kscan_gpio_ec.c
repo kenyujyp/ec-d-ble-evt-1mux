@@ -148,7 +148,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
 
     /* disable all rows */
     for (int r = 0; r < config->rows; r++){
-      gpio_pin_set_dt(&config->row_gpios.gpios[r], 0);   // write pin low 
+      gpio_pin_set_dt(&config->row_gpios.[r], 0);   // write pin low 
     }
      
     for (int row = 0; row < config->rows; row++) {
@@ -157,7 +157,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
         continue;
       }
 
-      gpio_pin_set_dt(&config->row_gpios.gpios[row], 0);   // disable current row
+      gpio_pin_set_dt(&config->row_gpios[row], 0);   // disable current row
 
       /* disable both multiplexers, mux output is disabled when enable pin is high */
       gpio_pin_set_dt(&config->mux0_en, 0);  // drive high, active low
@@ -165,7 +165,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
 
       /* multiplexer channel select */
       for (uint8_t i = 0; i < 3; i++) {
-        gpio_pin_set_dt(&config->mux_sels.gpios[i], (ch >> i) & 1);
+        gpio_pin_set_dt(&config->mux_sels[i], (ch >> i) & 1);
       }
 
       /* adjusted position index in matrix */
@@ -180,7 +180,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
       k_busy_wait(1);  // Ensure discharge is off
 
       // set current row pin high
-      gpio_pin_set_dt(&config->row_gpios.gpios[row], 1);
+      gpio_pin_set_dt(&config->row_gpios[row], 1);
       // wait for charge, 5us, need to define!!
       k_busy_wait(5);
       // reenable mux_0
@@ -193,7 +193,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
       irq_unlock(lock);
       // -- END LOCK --
       /* drive current row low */
-      gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
+      gpio_pin_set_dt(&config->row_gpios[row], 0);
       /* pull low discharge pin and configure pin to output to drain external circuit */
       gpio_pin_configure_dt(&config->discharge, GPIO_OUTPUT);
       gpio_pin_set_dt(&config->discharge, 0);   // drive low, active high
@@ -274,12 +274,12 @@ static void kscan_ec_work_handler(struct k_work *work) {
   
     // Init rows
     for (int i = 0; i < config->row_gpios.len; i++) {
-      gpio_pin_configure_dt(&config->row_gpios.gpios[i], GPIO_OUTPUT);
+      gpio_pin_configure_dt(&config->row_gpios[i], GPIO_OUTPUT);
     }
   
     // Init mux sel
     for (int i = 0; i < config->mux_sels.len; i++) {
-      gpio_pin_configure_dt(&config->mux_sels.gpios[i],
+      gpio_pin_configure_dt(&config->mux_sels[i],
                             GPIO_OUTPUT);
     }
   
