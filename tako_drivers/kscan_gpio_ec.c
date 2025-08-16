@@ -150,7 +150,12 @@ static void kscan_ec_work_handler(struct k_work *work) {
   k_sleep(K_MSEC(config->matrix_warm_up_ms));
 
   for (int col = 0; col < config->cols; col++) {
-    uint16_t ch = config->col_channels[col];
+    uint8_t ch = config->col_channels[col];
+
+    /* disable all rows */
+    for (int r = 0; r < config->rows; r++){
+      gpio_pin_set_dt(&config->row_gpios.gpios[r].spec, 0);   // write pin low 
+    }
      
     for (int row = 0; row < config->rows; row++) {
       /* check if it is masked for this row col, skip it if yes */
@@ -158,19 +163,14 @@ static void kscan_ec_work_handler(struct k_work *work) {
         continue;
       }
 
+      gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);   // disable current row
+
       /* disable both multiplexers, mux output is disabled when enable pin is high */
       gpio_pin_set_dt(&config->mux0_en.spec, 1);
 
       /* multiplexer channel select */
       for (uint8_t i = 0; i < 3; i++) {
-        gpio_pin_set_dt(&config->mux_sels.gpios[i].spec, ch & (1 << i));
-      }
-
-      /* disable unused rows */
-      for (int r = 0; r < config->rows; r++){
-        if (r != row) {
-          gpio_pin_set_dt(&config->row_gpios.gpios[r].spec, 0);
-        }
+        gpio_pin_set_dt(&config->mux_sels.gpios[i].spec, (ch >> i) & 1);
       }
 
       /* adjusted position index in matrix */
@@ -178,41 +178,41 @@ static void kscan_ec_work_handler(struct k_work *work) {
 
       // --- LOCK ---
       const unsigned int lock = irq_lock();
+      // charge phase
       // set discharge pin to high impedance
       gpio_pin_configure_dt(&config->discharge.spec, GPIO_INPUT);
-      //gpio_pin_set_dt(&config->discharge.spec, 1);
+      k_busy_wait(1);  // Ensure discharge is off
+
       // set current row pin high
       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 1);
-      // wait for charge, typical 1ns, need to define!!
+      // wait for charge, 5us, need to define!!
       k_busy_wait(5);
       // reenable mux_0
       gpio_pin_set_dt(&config->mux0_en.spec, 0);
 
       /* read adc */
       rc = adc_read(config->adc_channel.dev, adc_seq);
-
       adc_seq->calibrate = false;
- 
+
+      /* drive current row low */
+      gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
+      irq_unlock(lock);
+      // -- END LOCK --
+      /* pull low discharge pin and configure pin to output to drain external circuit */
+      gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
+      gpio_pin_set_dt(&config->discharge.spec, 0);
+      
+
+      /* handle matrix reads */
+      const bool pressed = data->matrix_state[index];
       // shift 4 for correct range value
       if (rc == 0) {
         matrix_read = (data->adc_raw >> 4);
       } else {
         LOG_ERR("Failed to read ADC: %d", rc);
       }
-      irq_unlock(lock);
-      // -- END LOCK --
-      /* drive current row low */
-      gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
-      /* pull low discharge pin and configure pin to output to drain external circuit */
-      
-      gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
-      gpio_pin_set_dt(&config->discharge.spec, 0);
-      
-      /* handle matrix reads */
-      const bool pressed = data->matrix_state[index];
-
       /* print reading for debugging, uncomment in final build */
-      printk("reading: %d, %d, %u, %u\n", row, col, matrix_read, noise_floor[index]);
+      //printk("reading: %d, %d, %u, %u\n", row, col, matrix_read, noise_floor[index]);
       
       /* real time noise floor calibration */
       if (matrix_read < noise_floor[index]) {
@@ -238,7 +238,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
         //data->callback(data->dev, row, col, false);
       }
       
-      // wait for discharge, 10ns
+      // wait for discharge, 10us
       k_busy_wait(10);
     }
   }
@@ -274,21 +274,21 @@ static void kscan_ec_work_handler(struct k_work *work) {
       LOG_ERR("ADC sequence init error %d", rc);
     }
   
-    gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
   
     // Init rows
     for (int i = 0; i < config->row_gpios.len; i++) {
-      gpio_pin_configure_dt(&config->row_gpios.gpios[i].spec, GPIO_OUTPUT_INACTIVE);
+      gpio_pin_configure_dt(&config->row_gpios.gpios[i].spec, GPIO_OUTPUT);
     }
   
     // Init mux sel
     for (int i = 0; i < config->mux_sels.len; i++) {
       gpio_pin_configure_dt(&config->mux_sels.gpios[i].spec,
-                            GPIO_OUTPUT_INACTIVE);
+                            GPIO_OUTPUT);
     }
   
     // Init both muxes
-    gpio_pin_set_dt(&config->mux0_en.spec, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_set_dt(&config->mux0_en.spec, GPIO_OUTPUT);
   
     k_timer_init(&data->work_timer, kscan_ec_timer_handler, NULL);
     k_work_init(&data->work, kscan_ec_work_handler);
