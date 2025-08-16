@@ -59,7 +59,6 @@
   bool *matrix_state;
 };
 
- 
  struct kscan_ec_config {
    struct kscan_gpio_list row_gpios;
    struct kscan_gpio_list mux_sels;
@@ -77,7 +76,6 @@
 
    const uint32_t* row_input_masks;
    uint16_t col_channels[];
-   
    
  };
  
@@ -166,7 +164,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);   // disable current row
 
       /* disable both multiplexers, mux output is disabled when enable pin is high */
-      gpio_pin_set_dt(&config->mux0_en.spec, 1);
+      gpio_pin_set_dt(&config->mux0_en.spec, 0);  // drive high, active low
 
       /* multiplexer channel select */
       for (uint8_t i = 0; i < 3; i++) {
@@ -188,19 +186,19 @@ static void kscan_ec_work_handler(struct k_work *work) {
       // wait for charge, 5us, need to define!!
       k_busy_wait(5);
       // reenable mux_0
-      gpio_pin_set_dt(&config->mux0_en.spec, 0);
+      gpio_pin_set_dt(&config->mux0_en.spec, 1);    // active low
 
       /* read adc */
       rc = adc_read(config->adc_channel.dev, adc_seq);
       adc_seq->calibrate = false;
 
-      /* drive current row low */
-      gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
       irq_unlock(lock);
       // -- END LOCK --
+      /* drive current row low */
+      gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
       /* pull low discharge pin and configure pin to output to drain external circuit */
       gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
-      gpio_pin_set_dt(&config->discharge.spec, 0);
+      gpio_pin_set_dt(&config->discharge.spec, 1);   // active low
       
 
       /* handle matrix reads */
