@@ -56,10 +56,10 @@
 };
 
  struct kscan_ec_config {
-   struct kscan_gpio_list row_gpios;
-   struct kscan_gpio_list mux_sels;
-   struct kscan_gpio mux0_en; //mux enable GPIO pin
-   struct kscan_gpio discharge;
+   struct gpio_dt_spec* row_gpios;
+   struct gpio_dt_spec* mux_sels;
+   struct gpio_dt_spec mux0_en; //mux enable GPIO pin
+   struct gpio_dt_spec discharge;
    struct adc_dt_spec adc_channel;
  
    size_t rows;
@@ -176,7 +176,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
       // charge phase
       // set discharge pin to high impedance
       gpio_pin_configure_dt(&config->discharge, GPIO_INPUT);
-      gpio_pin_set_dt(&config->discharge, 1);
+      gpio_pin_set_dt(&config->discharge, 1);   // !!!! 2 or 1
       k_busy_wait(1);  // Ensure discharge is off
 
       // set current row pin high
@@ -184,7 +184,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
       // wait for charge, 5us, need to define!!
       k_busy_wait(5);
       // reenable mux_0
-      gpio_pin_set_dt(&config->mux0_en, 1);    // active low
+      gpio_pin_set_dt(&config->mux0_en, 1);    // drive low, active low
 
       /* read adc */
       rc = adc_read(config->adc_channel.dev, adc_seq);
@@ -196,8 +196,8 @@ static void kscan_ec_work_handler(struct k_work *work) {
       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
       /* pull low discharge pin and configure pin to output to drain external circuit */
       gpio_pin_configure_dt(&config->discharge, GPIO_OUTPUT);
-      gpio_pin_set_dt(&config->discharge, 0);   // active high
-      
+      gpio_pin_set_dt(&config->discharge, 0);   // drive low, active high
+
 
       /* handle matrix reads */
       const bool pressed = data->matrix_state[index];
@@ -349,9 +349,14 @@ static void kscan_ec_work_handler(struct k_work *work) {
     (static const uint32_t row_input_masks_##n[] = DT_INST_PROP(n, row_input_masks);),   \
     ())                                                                         \
                                                                                 \
+   static const struct gpio_dt_spec row_gpios_##n[] = {                         \
+      DT_FOREACH_PROP_ELEM(DT_DRV_INST(n), row_gpios, ZKEM_GPIO_DT_SPEC_ELEM)}; \
+   static const struct gpio_dt_spec mux_sels_##n[] = {                         \
+      DT_FOREACH_PROP_ELEM(DT_DRV_INST(n), mux_sel_gpios, ZKEM_GPIO_DT_SPEC_ELEM)}; \
+                                                                                \
    static struct kscan_ec_config kscan_ec_config_##n = {                        \
-       .row_gpios = {DT_FOREACH_PROP_ELEM(DT_DRV_INST(n), row_gpios, ZKEM_GPIO_DT_SPEC_ELEM)},   \
-       .mux_sels = {DT_FOREACH_PROP_ELEM(DT_DRV_INST(n), mux_sel_gpios, ZKEM_GPIO_DT_SPEC_ELEM)},  \
+       .row_gpios = row_gpios_##n,                                              \
+       .mux_sels = mux_sels_##n,                                                \
        .mux0_en = GPIO_DT_SPEC_INST_GET_OR(n, mux0_en_gpios, {0}),              \
        COND_CODE_1(DT_INST_NODE_HAS_PROP(n, row_input_masks),                   \
                     (.row_input_masks = row_input_masks_##n, ), ())             \
