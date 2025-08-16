@@ -148,7 +148,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
 
     /* disable all rows */
     for (int r = 0; r < config->rows; r++){
-      gpio_pin_set_dt(&config->row_gpios.[r], 0);   // write pin low 
+      gpio_pin_set_dt(&config->row_gpios[r], 0);   // write pin low 
     }
      
     for (int row = 0; row < config->rows; row++) {
