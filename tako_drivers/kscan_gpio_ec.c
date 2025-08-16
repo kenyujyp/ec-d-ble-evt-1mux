@@ -175,7 +175,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
       // charge phase
       // set discharge pin to high impedance
       gpio_pin_configure_dt(&config->discharge, GPIO_INPUT);
-      gpio_pin_set_dt(&config->discharge, 1);   // !!!! 2 or 1
+      //gpio_pin_set_dt(&config->discharge, 1);   // !!!! 2 or 1
       k_busy_wait(1);  // Ensure discharge is off
 
       // set current row pin high
