@@ -19,14 +19,10 @@
  
  #define DT_DRV_COMPAT zmk_kscan_gpio_ec
  
- #define INST_ROWS_LEN(n) DT_INST_PROP_LEN(n, row_gpios)
- #define INST_MUX_SELS_LEN(n) DT_INST_PROP_LEN(n, mux_sel_gpios)
+ #define INST_ROWS_LEN(n) 
+ #define INST_MUX_SELS_LEN(n) 
  #define INST_COL_CHANNELS_LEN(n) DT_INST_PROP_LEN(n, col_channels)
- 
- #define KSCAN_GPIO_ROW_CFG_INIT(idx, inst_idx)                                 \
-   KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(inst_idx), row_gpios, idx)
- #define KSCAN_GPIO_MUX_SEL_CFG_INIT(idx, inst_idx)                             \
-   KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(inst_idx), mux_sel_gpios, idx)
+
  
  #define INST_MATRIX_LEN(n) (INST_ROWS_LEN(n) * INST_COL_CHANNELS_LEN(n))
  
@@ -152,7 +148,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
 
     /* disable all rows */
     for (int r = 0; r < config->rows; r++){
-      gpio_pin_set_dt(&config->row_gpios.gpios[r].spec, 0);   // write pin low 
+      gpio_pin_set_dt(&config->row_gpios.gpios[r], 0);   // write pin low 
     }
      
     for (int row = 0; row < config->rows; row++) {
@@ -161,44 +157,46 @@ static void kscan_ec_work_handler(struct k_work *work) {
         continue;
       }
 
-      gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);   // disable current row
+      gpio_pin_set_dt(&config->row_gpios.gpios[row], 0);   // disable current row
 
       /* disable both multiplexers, mux output is disabled when enable pin is high */
-      gpio_pin_set_dt(&config->mux0_en.spec, 0);  // drive high, active low
+      //gpio_pin_set_dt(&config->mux0_en, 0);  // drive high, active low
+      gpio_pin_configure_dt(&config->mux0_en, GPIO_INPUT);
 
       /* multiplexer channel select */
       for (uint8_t i = 0; i < 3; i++) {
-        gpio_pin_set_dt(&config->mux_sels.gpios[i].spec, (ch >> i) & 1);
+        gpio_pin_set_dt(&config->mux_sels.gpios[i], (ch >> i) & 1);
       }
 
       /* adjusted position index in matrix */
-      const int index = state_index_rc(config, row, col);
+      const uint16_t index = state_index_rc(config, row, col);
 
       // --- LOCK ---
-      const unsigned int lock = irq_lock();
+      const uint32_t lock = irq_lock();
       // charge phase
       // set discharge pin to high impedance
-      gpio_pin_configure_dt(&config->discharge.spec, GPIO_INPUT);
+      gpio_pin_configure_dt(&config->discharge, GPIO_INPUT);
+      gpio_pin_set_dt(&config->discharge, 1);
       k_busy_wait(1);  // Ensure discharge is off
 
       // set current row pin high
-      gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 1);
+      gpio_pin_set_dt(&config->row_gpios.gpios[row], 1);
       // wait for charge, 5us, need to define!!
       k_busy_wait(5);
       // reenable mux_0
-      gpio_pin_set_dt(&config->mux0_en.spec, 1);    // active low
+      gpio_pin_set_dt(&config->mux0_en, 1);    // active low
 
       /* read adc */
       rc = adc_read(config->adc_channel.dev, adc_seq);
-      adc_seq->calibrate = false;
+      //adc_seq->calibrate = false;
 
       irq_unlock(lock);
       // -- END LOCK --
       /* drive current row low */
       gpio_pin_set_dt(&config->row_gpios.gpios[row].spec, 0);
       /* pull low discharge pin and configure pin to output to drain external circuit */
-      gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
-      gpio_pin_set_dt(&config->discharge.spec, 1);   // active low
+      gpio_pin_configure_dt(&config->discharge, GPIO_OUTPUT);
+      gpio_pin_set_dt(&config->discharge, 0);   // active high
       
 
       /* handle matrix reads */
@@ -272,7 +270,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
       LOG_ERR("ADC sequence init error %d", rc);
     }
   
-    gpio_pin_configure_dt(&config->discharge.spec, GPIO_OUTPUT);
+    gpio_pin_configure_dt(&config->discharge, GPIO_OUTPUT);
   
     // Init rows
     for (int i = 0; i < config->row_gpios.len; i++) {
@@ -286,7 +284,7 @@ static void kscan_ec_work_handler(struct k_work *work) {
     }
   
     // Init both muxes
-    gpio_pin_set_dt(&config->mux0_en.spec, GPIO_OUTPUT);
+    gpio_pin_set_dt(&config->mux0_en, GPIO_OUTPUT);
   
     k_timer_init(&data->work_timer, kscan_ec_timer_handler, NULL);
     k_work_init(&data->work, kscan_ec_work_handler);
@@ -335,11 +333,9 @@ static void kscan_ec_work_handler(struct k_work *work) {
      .disable_callback = kscan_ec_disable
  };
  
+ #define ZKEM_GPIO_DT_SPEC_ELEM(n, prop, idx) GPIO_DT_SPEC_GET_BY_IDX(n, prop, idx)
+
  #define KSCAN_EC_INIT(n)                                                       \
-   static struct kscan_gpio kscan_ec_row_gpios_##n[] = {                        \
-       LISTIFY(INST_ROWS_LEN(n), KSCAN_GPIO_ROW_CFG_INIT, (, ), n)};            \
-   static struct kscan_gpio kscan_ec_mux_sel_gpios_##n[] = {                    \
-       LISTIFY(INST_MUX_SELS_LEN(n), KSCAN_GPIO_MUX_SEL_CFG_INIT, (, ), n)};    \
                                                                                 \
    static bool kscan_ec_matrix_state_##n[INST_MATRIX_LEN(n)];                   \
                                                                                 \
@@ -354,19 +350,19 @@ static void kscan_ec_work_handler(struct k_work *work) {
     ())                                                                         \
                                                                                 \
    static struct kscan_ec_config kscan_ec_config_##n = {                        \
-       .row_gpios = KSCAN_GPIO_LIST(kscan_ec_row_gpios_##n),                    \
-       .mux_sels = KSCAN_GPIO_LIST(kscan_ec_mux_sel_gpios_##n),                 \
-       .mux0_en = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), mux0_en_gpios, 0),      \
+       .row_gpios = {DT_FOREACH_PROP_ELEM(DT_DRV_INST(n), row_gpios, ZKEM_GPIO_DT_SPEC_ELEM)},   \
+       .mux_sels = {DT_FOREACH_PROP_ELEM(DT_DRV_INST(n), mux_sel_gpios, ZKEM_GPIO_DT_SPEC_ELEM)},  \
+       .mux0_en = GPIO_DT_SPEC_INST_GET_OR(n, mux0_en_gpios, {0}),              \
        COND_CODE_1(DT_INST_NODE_HAS_PROP(n, row_input_masks),                   \
                     (.row_input_masks = row_input_masks_##n, ), ())             \
-       .discharge = KSCAN_GPIO_GET_BY_IDX(DT_DRV_INST(n), discharge_gpios, 0),  \
+       .discharge = GPIO_DT_SPEC_INST_GET_OR(n, discharge_gpios, {0}),          \
        .matrix_warm_up_ms = DT_INST_PROP(n, matrix_warm_up_ms),                 \
        .matrix_relax_us = DT_INST_PROP(n, matrix_relax_us),                     \
        .active_polling_interval_ms = DT_INST_PROP(n, active_polling_interval_ms),      \
        .idle_polling_interval_ms = DT_INST_PROP(n, idle_polling_interval_ms),   \
        .col_channels = DT_INST_PROP(n, col_channels),                           \
-       .rows = INST_ROWS_LEN(n),                                                \
-       .cols = INST_COL_CHANNELS_LEN(n),                                        \
+       .rows = DT_INST_PROP_LEN(n, row_gpios),                                  \
+       .cols = DT_INST_PROP_LEN(n, mux_sel_gpios)                               \
        .adc_channel = ADC_DT_SPEC_INST_GET(n),                                  \
    };                                                                           \
    static int kscan_ec_activity_event_handler_wrapper##n(                       \
